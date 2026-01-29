@@ -1,0 +1,9 @@
+<Files ".env">
+    Order allow,deny
+    Deny from all
+</Files>
+
+RewriteEngine On
+RewriteCond %{request_filename} -f
+RewriteRule ^(.*) $1 [L]
+RewriteRule ^status status.php [NC]
