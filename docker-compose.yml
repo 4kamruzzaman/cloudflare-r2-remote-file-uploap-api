@@ -34,6 +34,8 @@ services:
   # ----------------------------------------------------------------
   db:
     image: mysql:8.0
+    ports:
+      - "3306:3306"
     container_name: bizsafer-r2-db
     restart: unless-stopped
     command: --default-authentication-plugin=mysql_native_password

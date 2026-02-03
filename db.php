@@ -2,12 +2,36 @@
 // db.php — shared helpers (PDO + R2 + status helpers)
 date_default_timezone_set('Asia/Dhaka');
 
-function env(): array
+function env(string $key = null, $default = null)
 {
-    static $env;
-    if ($env) return $env;
-    $env = parse_ini_file(__DIR__ . '/.env', false, INI_SCANNER_TYPED) ?: [];
-    return $env;
+    static $vars = null;
+
+    // 1. Check true Environment Variable (Docker/System)
+    if ($key !== null) {
+        $val = getenv($key);
+        if ($val !== false) return $val;
+    }
+
+    // 2. Check $_ENV superglobal
+    if ($key !== null && isset($_ENV[$key])) {
+        return $_ENV[$key];
+    }
+
+    // 3. Lazy-load .env file as fallback
+    if ($vars === null) {
+        $path = __DIR__ . '/.env';
+        if (file_exists($path)) {
+            // Suppress warnings for non-standard comments if any
+            $vars = @parse_ini_file($path, false, INI_SCANNER_TYPED) ?: [];
+        } else {
+            $vars = [];
+        }
+    }
+
+    if ($key === null) return $vars;
+    if (isset($vars[$key])) return $vars[$key];
+
+    return $default;
 }
 
 function db(): PDO
@@ -15,9 +39,14 @@ function db(): PDO
     static $pdo;
     if ($pdo instanceof PDO) return $pdo;
 
-    $e = env();
-    $dsn = "mysql:host={$e['DB_HOST']};dbname={$e['DB_NAME']};charset=utf8mb4";
-    $pdo = new PDO($dsn, $e['DB_USER'], $e['DB_PASS'], [
+    // $e = env(); // OLD
+    $host = env('DB_HOST');
+    $db   = env('DB_NAME');
+    $user = env('DB_USER');
+    $pass = env('DB_PASS');
+
+    $dsn = "mysql:host={$host};dbname={$db};charset=utf8mb4";
+    $pdo = new PDO($dsn, $user, $pass, [
         PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
     ]);
@@ -86,15 +115,15 @@ function r2(): Aws\S3\S3Client
     static $s3;
     if ($s3) return $s3;
 
-    $e = env();
+    // $e = env();
     $s3 = new Aws\S3\S3Client([
         'version'                 => 'latest',
-        'region'                  => $e['R2_REGION'] ?? 'auto',
-        'endpoint'                => "https://{$e['R2_ACCOUNT_ID']}.r2.cloudflarestorage.com",
+        'region'                  => env('R2_REGION', 'auto'),
+        'endpoint'                => "https://" . env('R2_ACCOUNT_ID') . ".r2.cloudflarestorage.com",
         'use_path_style_endpoint' => true,
         'credentials'             => [
-            'key'    => $e['R2_KEY_ID'],
-            'secret' => $e['R2_SECRET_KEY'],
+            'key'    => env('R2_KEY_ID'),
+            'secret' => env('R2_SECRET_KEY'),
         ],
     ]);
     return $s3;
@@ -103,18 +132,18 @@ function r2(): Aws\S3\S3Client
 /** Build public file URL from key (filename) */
 function r2_url(string $key): string
 {
-    $base = rtrim(env()['R2_CUSTOM_DOMAIN'] ?? '', '/');
+    $base = rtrim(env('R2_CUSTOM_DOMAIN', ''), '/');
     return $base . '/' . ltrim($key, '/');
 }
 
 /** Delete an object from R2 (ignore if missing). */
 function r2_delete(string $key): void
 {
-    $e  = env();
+    $bucket = env('R2_BUCKET');
     $s3 = r2();
     try {
         $s3->deleteObject([
-            'Bucket' => $e['R2_BUCKET'],
+            'Bucket' => $bucket,
             'Key'    => ltrim($key, '/'),
         ]);
     } catch (Throwable $t) {
