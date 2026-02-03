@@ -24,18 +24,17 @@ if ($argc < 3) {
 $url       = $argv[1];
 $objectKey = basename($argv[2]);
 
-// env + clients
-$e   = env();
+// env + clients (Removed $e array dependency)
 $s3  = r2();
 $http = new Client([
     'timeout'         => 0,
-    'connect_timeout' => (int)($e['DL_CONNECT_TIMEOUT'] ?? 30),
+    'connect_timeout' => (int)env('DL_CONNECT_TIMEOUT', 30),
     'verify'          => false,
     'headers'         => ['User-Agent' => 'R2-Uploader/1.0']
 ]);
 
 // tuning
-$PART_MB        = max(5, (int)($e['R2_PART_SIZE_MB'] ?? 32));
+$PART_MB        = max(5, (int)env('R2_PART_SIZE_MB', 32));
 $PART_SIZE      = $PART_MB * 1024 * 1024;
 $DOWNLOAD_RETRY = 3;
 $UPLOAD_RETRY   = 3;
@@ -104,17 +103,18 @@ function downloadToTmp(Client $http, string $url, int $retries): array
     @unlink($tmp);
     throw new RuntimeException('Download failed after retries');
 }
-function uploadFileToR2(S3Client $s3, array $e, string $path, string $key, string $mime, int $partSize): int
+function uploadFileToR2(S3Client $s3, string $path, string $key, string $mime, int $partSize): int
 {
+    $bucket = env('R2_BUCKET');
     // overwrite behavior
     try {
-        $s3->deleteObject(['Bucket' => $e['R2_BUCKET'], 'Key' => $key]);
+        $s3->deleteObject(['Bucket' => $bucket, 'Key' => $key]);
     } catch (Throwable $t) {
     }
 
     $t0 = microtime(true);
     $uploader = new MultipartUploader($s3, $path, [
-        'bucket'      => $e['R2_BUCKET'],
+        'bucket'      => $bucket,
         'key'         => $key,
         'part_size'   => $partSize,
         'concurrency' => 4,
@@ -128,10 +128,10 @@ function uploadFileToR2(S3Client $s3, array $e, string $path, string $key, strin
     $uploader->upload();
     return (int)round(microtime(true) - $t0);
 }
-function verifyUploadSize(S3Client $s3, array $e, string $key, int $localBytes): bool
+function verifyUploadSize(S3Client $s3, string $key, int $localBytes): bool
 {
     try {
-        $head = $s3->headObject(['Bucket' => $e['R2_BUCKET'], 'Key' => $key]);
+        $head = $s3->headObject(['Bucket' => env('R2_BUCKET'), 'Key' => $key]);
         $remote = (int)($head['ContentLength'] ?? 0);
         return $remote === $localBytes;
     } catch (AwsException $ex) {
@@ -156,9 +156,9 @@ try {
     while (true) {
         $attempt++;
         try {
-            $ulSec = uploadFileToR2($s3, $e, $tmpFile, $objectKey, $mimeType, $PART_SIZE);
+            $ulSec = uploadFileToR2($s3, $tmpFile, $objectKey, $mimeType, $PART_SIZE);
 
-            if (verifyUploadSize($s3, $e, $objectKey, $sizeBytes)) {
+            if (verifyUploadSize($s3, $objectKey, $sizeBytes)) {
                 $urlPublic = r2_url($objectKey);
                 setStatus($objectKey, 'completed', $urlPublic, 'Uploaded successfully', 0, $sizeBytes, null, $dlSec, $ulSec);
                 echo json_encode(['success' => true, 'file_url' => $urlPublic, 'size_bytes' => $sizeBytes, 'download_time_sec' => $dlSec, 'upload_time_sec' => $ulSec]);
