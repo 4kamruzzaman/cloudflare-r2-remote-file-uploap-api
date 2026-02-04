@@ -1,0 +1,39 @@
+name: BizSafer Production Deploy
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 🛡️ Security Handshake (SSH)
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_PRIVATE_SSH_KEY }}
+          script: |
+            # 1. Navigate to Project Root
+            cd /opt/app
+
+            # 2. Pull Latest Code
+            echo "📥 Pulling latest code..."
+            git pull origin main
+
+            # 3. Rebuild Container (Optimized)
+            echo "🏗️ Building new image..."
+            docker compose build --no-cache
+
+            # 4. Zero-Downtime Restart
+            echo "🚀 Restarting services..."
+            docker compose up -d
+
+            # 5. Cleanup (Save Disk Space)
+            echo "🧹 Cleaning up old artifacts..."
+            docker image prune -f
+            
+            # 6. Verification
+            echo "✅ Deployment Complete."
+            docker compose ps
