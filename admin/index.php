@@ -52,8 +52,14 @@ require_once 'auth_guard.php'; // 🔐 protect admin
         <div class="flex items-center justify-between gap-3 mb-4">
             <h1 class="text-2xl font-bold">📦 R2 Uploads — Admin</h1>
             <div class="flex items-center gap-2">
-                <a href="/admin/logout.php" class="px-3 py-2 rounded border border-slate-300 dark:border-slate-700">Logout</a>
-                <button @click="toggleTheme()" class="px-3 py-2 rounded border border-slate-300 dark:border-slate-700">
+                <a href="/admin/upload.php" class="px-3 py-2 rounded bg-emerald-600 text-white hover:bg-emerald-700 flex items-center gap-1">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+                    </svg>
+                    Upload
+                </a>
+                <a href="/admin/logout.php" class="px-3 py-2 rounded border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800">Logout</a>
+                <button @click="toggleTheme()" class="px-3 py-2 rounded border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800">
                     <span x-text="themeLabel()"></span>
                 </button>
                 <button @click="refresh()" class="px-3 py-2 rounded bg-blue-600 text-white hover:bg-blue-700">Refresh</button>

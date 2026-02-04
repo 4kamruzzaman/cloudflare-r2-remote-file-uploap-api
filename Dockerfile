@@ -33,7 +33,14 @@ RUN apt-get update -qq && apt-get install -y -qq --no-install-recommends \
 # 2. Apache Configuration
 RUN a2enmod rewrite
 
-# 3. Set Working Directory
+# 3. PHP Configuration for large file uploads
+RUN echo "upload_max_filesize = 2048M" > /usr/local/etc/php/conf.d/uploads.ini \
+    && echo "post_max_size = 2048M" >> /usr/local/etc/php/conf.d/uploads.ini \
+    && echo "max_execution_time = 600" >> /usr/local/etc/php/conf.d/uploads.ini \
+    && echo "max_input_time = 600" >> /usr/local/etc/php/conf.d/uploads.ini \
+    && echo "memory_limit = 512M" >> /usr/local/etc/php/conf.d/uploads.ini
+
+# 4. Set Working Directory
 WORKDIR /var/www/html
 
 # 4. Copy Only Necessary Files
