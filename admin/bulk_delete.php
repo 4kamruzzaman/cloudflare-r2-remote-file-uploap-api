@@ -7,6 +7,7 @@ require '../vendor/autoload.php';
 use Aws\S3\S3Client;
 use Aws\Exception\AwsException;
 
+try {
 $input = json_decode(file_get_contents('php://input'), true);
 $keys  = $input['keys'] ?? [];
 
@@ -15,17 +16,16 @@ if (empty($keys) || !is_array($keys)) {
     exit;
 }
 
-$env = parse_ini_file('../.env');
-$db  = db();
+    $db  = db();
 
 $s3 = new S3Client([
     'version' => 'latest',
-    'region'  => $env['R2_REGION'] ?? 'auto',
-    'endpoint' => "https://{$env['R2_ACCOUNT_ID']}.r2.cloudflarestorage.com",
+        'region'  => env('R2_REGION', 'auto'),
+        'endpoint' => "https://" . env('R2_ACCOUNT_ID') . ".r2.cloudflarestorage.com",
     'use_path_style_endpoint' => true,
     'credentials' => [
-        'key'    => $env['R2_KEY_ID'],
-        'secret' => $env['R2_SECRET_KEY']
+            'key'    => env('R2_KEY_ID'),
+            'secret' => env('R2_SECRET_KEY')
     ]
 ]);
 
@@ -46,7 +46,7 @@ foreach ($keys as $key) {
     // 2️⃣ Delete from R2
     try {
         $s3->deleteObject([
-            'Bucket' => $env['R2_BUCKET'],
+                'Bucket' => env('R2_BUCKET'),
             'Key'    => $key
         ]);
         $deletedR2++;
@@ -64,3 +64,7 @@ echo json_encode([
     'deleted_r2'  => $deletedR2,
     'errors'      => $errors
 ]);
+} catch (Throwable $e) {
+    http_response_code(500);
+    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+}

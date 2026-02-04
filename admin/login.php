@@ -12,15 +12,13 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
     session_start();
 }
 
-$env = @parse_ini_file(__DIR__ . '/../.env') ?: [];
-
 $error = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $u = trim($_POST['username'] ?? '');
     $p = (string)($_POST['password'] ?? '');
 
-    $ADMIN_USER = $env['ADMIN_USER'] ?? 'admin';
-    $ADMIN_PASS_HASH = $env['ADMIN_PASS_HASH'] ?? null;
+    $ADMIN_USER = getenv('ADMIN_USER') ?: 'admin';
+    $ADMIN_PASS_HASH = getenv('ADMIN_PASS_HASH');
 
     if (!$ADMIN_PASS_HASH) {
         $error = 'Admin password not configured. Set ADMIN_PASS_HASH in .env';
