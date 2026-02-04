@@ -1,56 +1,49 @@
-# -------------------------------------------
-# BizSafer Standard: Base Image (LTS)
-# -------------------------------------------
+# ----------------------------------------------------------------
+# Stage 1: The Builder (Heavy Lifting)
+# ----------------------------------------------------------------
+# We use a dedicated Composer image to handle dependencies.
+# This keeps our final image clean of git/unzip/cache artifacts.
+FROM composer:latest as builder
+
+WORKDIR /app
+COPY composer.json composer.lock ./
+
+# Install dependencies optimized for production
+# --no-dev: Skip testing packages
+# --optimize-autoloader: Speeds up class loading
+# --no-scripts: Security precaution
+RUN composer install --no-dev --optimize-autoloader --no-scripts --ignore-platform-reqs
+
+# ----------------------------------------------------------------
+# Stage 2: The Production Server (Lean & Fast)
+# ----------------------------------------------------------------
 FROM php:8.2-apache
 
-# -------------------------------------------
-# 1. Install System Dependencies
-# Required for zip handling and mysql connectivity
-# -------------------------------------------
-RUN apt-get update && apt-get install -y \
+# 1. Install System Dependencies & Cleanup in ONE Layer
+# -qq: Quiet mode (reduces log spam)
+# --no-install-recommends: Skips useless extras
+# rm -rf /var/lib/apt/lists/*: Deletes the apt cache (Saves disk space)
+RUN apt-get update -qq && apt-get install -y -qq --no-install-recommends \
     libzip-dev \
-    unzip \
-    git \
     libonig-dev \
-    && docker-php-ext-install pdo_mysql zip mbstring
+    && docker-php-ext-install -j$(nproc) pdo_mysql zip mbstring \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
-# -------------------------------------------
 # 2. Apache Configuration
-# Enable mod_rewrite for your .htaccess files
-# -------------------------------------------
 RUN a2enmod rewrite
 
-# -------------------------------------------
-# 3. Install Composer
-# Get the official dependency manager
-# -------------------------------------------
-COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
-
-# -------------------------------------------
-# 4. Set Working Directory
-# -------------------------------------------
+# 3. Set Working Directory
 WORKDIR /var/www/html
 
-# -------------------------------------------
-# 5. Dependency Installation (Cache Layer)
-# We copy composer files FIRST to speed up future builds
-# -------------------------------------------
-COPY composer.json composer.lock ./
-RUN composer install --no-dev --optimize-autoloader --no-scripts
-
-# -------------------------------------------
-# 6. Copy Application Code
-# -------------------------------------------
+# 4. Copy Only Necessary Files
+# We grab the 'vendor' folder from the 'builder' stage above
+COPY --from=builder /app/vendor ./vendor
 COPY . .
 
-# -------------------------------------------
-# 7. Permissions & Cleanup
-# Ensure the web server owns the files
-# -------------------------------------------
+# 5. Set Permissions (Standard Apache User)
 RUN chown -R www-data:www-data /var/www/html \
     && chmod -R 755 /var/www/html
 
-# -------------------------------------------
-# 8. Entrypoint
-# -------------------------------------------
+# 6. Launch
 CMD ["apache2-foreground"]
